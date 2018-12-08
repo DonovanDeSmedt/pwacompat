@@ -18,7 +18,7 @@
 
 (function() {
   if (!('fetch' in window)) {
-    return;  // basic feature detection: from Mobile Safari 10.3+
+    return; // basic feature detection: from Mobile Safari 10.3+
   }
 
   const capableDisplayModes = ['standalone', 'fullscreen', 'minimal-ui'];
@@ -28,29 +28,33 @@
   const minimumSplashIconSize = 48;
   const splashIconPadding = 32;
 
-  const isSafari = (navigator.vendor && navigator.vendor.indexOf('Apple') !== -1);
-  const isEdge = (navigator.userAgent && navigator.userAgent.indexOf('Edge') !== -1);
-  const isEdgePWA = (typeof Windows !== 'undefined');
+  const isSafari = navigator.vendor && navigator.vendor.indexOf('Apple') !== -1;
+  const iOS = !!navigator.platform && /iPhone/.test(navigator.platform);
+  const isEdge = navigator.userAgent && navigator.userAgent.indexOf('Edge') !== -1;
+  const isEdgePWA = typeof Windows !== 'undefined';
 
   function setup() {
+    if (iOS) {
+      document.querySelector('link[rel="manifest"]').setAttribute('rel', 'no-on-ios');
+    }
     const manifestEl = document.head.querySelector('link[rel="manifest"]');
     const manifestHref = manifestEl ? manifestEl.href : '';
     const hrefFactory = buildHrefFactory([manifestHref, window.location]);
 
     Promise.resolve()
-        .then(() => {
-          if (!manifestHref) {
-            throw `can't find <link rel="manifest" href=".." />'`;
-          }
-          const opts = /** @type {!RequestInit} */ ({});
-          if (manifestHref.crossOrigin === 'use-credentials') {
-            opts.credentials = 'include';
-          }
-          return window.fetch(manifestHref, opts);
-        })
-        .then((response) => response.json())
-        .then((data) => process(data, hrefFactory))
-        .catch((err) => console.warn('pwacompat.js error', err));
+      .then(() => {
+        if (!manifestHref) {
+          throw `can't find <link rel="manifest" href=".." />'`;
+        }
+        const opts = /** @type {!RequestInit} */ ({});
+        if (manifestHref.crossOrigin === 'use-credentials') {
+          opts.credentials = 'include';
+        }
+        return window.fetch(manifestHref, opts);
+      })
+      .then(response => response.json())
+      .then(data => process(data, hrefFactory))
+      .catch(err => console.warn('pwacompat.js error', err));
   }
 
   /**
@@ -62,10 +66,10 @@
       const opt = options[i];
       try {
         new URL('', opt);
-        return (part) => (new URL(part, opt)).toString();
+        return part => new URL(part, opt).toString();
       } catch (e) {}
     }
-    return (part) => part;
+    return part => part;
   }
 
   function push(localName, attr) {
@@ -82,7 +86,7 @@
       if (content === true) {
         content = 'yes';
       }
-      push('meta', {name, content});
+      push('meta', { name, content });
     }
   }
 
@@ -92,10 +96,10 @@
    */
   function process(manifest, urlFactory) {
     const icons = manifest['icons'] || [];
-    icons.sort((a, b) => parseInt(b.sizes, 10) - parseInt(a.sizes, 10));  // largest first
-    const appleTouchIcons = icons.map((icon) => {
+    icons.sort((a, b) => parseInt(b.sizes, 10) - parseInt(a.sizes, 10)); // largest first
+    const appleTouchIcons = icons.map(icon => {
       // create icons as byproduct
-      const attr = {'rel': 'icon', 'href': urlFactory(icon['src']), 'sizes': icon['sizes']};
+      const attr = { rel: 'icon', href: urlFactory(icon['src']), sizes: icon['sizes'] };
       push('link', attr);
       if (isSafari) {
         attr['rel'] = 'apple-touch-icon';
@@ -106,7 +110,7 @@
     const display = manifest['display'];
     const isCapable = capableDisplayModes.indexOf(display) !== -1;
     meta('mobile-web-app-capable', isCapable);
-    updateThemeColorRender(/** @type {string} */ (manifest['theme_color']) || 'black');
+    updateThemeColorRender(/** @type {string} */ (manifest['theme_color'] || 'black'));
 
     if (isEdge) {
       meta('msapplication-starturl', manifest['start_url'] || '/');
@@ -120,22 +124,23 @@
 
     // TODO(samthor): We don't detect QQ or UC, we just set the vars anyway.
     const orientation = simpleOrientationFor(manifest['orientation']);
-    meta('x5-orientation', orientation);      // QQ
-    meta('screen-orientation', orientation);  // UC
+    meta('x5-orientation', orientation); // QQ
+    meta('screen-orientation', orientation); // UC
     if (display === 'fullscreen') {
-      meta('x5-fullscreen', 'true');  // QQ
-      meta('full-screen', 'yes');     // UC
+      meta('x5-fullscreen', 'true'); // QQ
+      meta('full-screen', 'yes'); // UC
     } else if (isCapable) {
-      meta('x5-page-mode', 'app');         // QQ
-      meta('browsermode', 'application');  // UC
+      meta('x5-page-mode', 'app'); // QQ
+      meta('browsermode', 'application'); // UC
     }
 
     if (!isSafari) {
-      return;  // the rest of this file is for Safari
+      return; // the rest of this file is for Safari
     }
 
     const backgroundIsLight = shouldUseLightForeground(
-        /** @type {string} */ (manifest['background_color']) || defaultSplashColor);
+      /** @type {string} */ (manifest['background_color'] || defaultSplashColor)
+    );
     const title = manifest['name'] || manifest['short_name'] || document.title;
 
     // Add related iTunes app from manifest.
@@ -146,9 +151,9 @@
     meta('apple-mobile-web-app-capable', isCapable);
     meta('apple-mobile-web-app-title', title);
 
-    function splashFor({width, height}, orientation, icon) {
+    function splashFor({ width, height }, orientation, icon) {
       const ratio = window.devicePixelRatio;
-      const ctx = contextForCanvas({width: width * ratio, height: height * ratio});
+      const ctx = contextForCanvas({ width: width * ratio, height: height * ratio });
 
       ctx.scale(ratio, ratio);
       ctx.fillStyle = manifest['background_color'] || defaultSplashColor;
@@ -161,11 +166,11 @@
 
       if (icon) {
         // nb: on Chrome, we need the image >=48px, use the big layout >=80dp, ideal is >=128dp
-        let iconWidth = (icon.width / ratio);
-        let iconHeight = (icon.height / ratio);
+        let iconWidth = icon.width / ratio;
+        let iconHeight = icon.height / ratio;
         if (iconHeight > idealSplashIconSize) {
           // clamp to 128px height max
-          iconWidth /= (iconHeight / idealSplashIconSize);
+          iconWidth /= iconHeight / idealSplashIconSize;
           iconHeight = idealSplashIconSize;
         }
 
@@ -187,12 +192,16 @@
     const previous = new Set();
     function updateSplash(applicationIcon) {
       const portrait = splashFor(window.screen, 'portrait', applicationIcon);
-      const landscape = splashFor({
-        width: window.screen.height,
-        height: window.screen.width,
-      }, 'landscape', applicationIcon);
+      const landscape = splashFor(
+        {
+          width: window.screen.height,
+          height: window.screen.width
+        },
+        'landscape',
+        applicationIcon
+      );
 
-      previous.forEach((prev) => prev.remove());
+      previous.forEach(prev => prev.remove());
 
       document.head.appendChild(portrait);
       document.head.appendChild(landscape);
@@ -217,12 +226,12 @@
       }
       const redrawn = updateTransparent(img, manifest['background_color']);
       if (redrawn === null) {
-        return;  // the rest probably aren't interesting either
+        return; // the rest probably aren't interesting either
       }
       icon.href = redrawn;
 
       // fetch and fix all remaining icons
-      appleTouchIcons.slice(1).forEach((icon) => {
+      appleTouchIcons.slice(1).forEach(icon => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
@@ -231,7 +240,6 @@
         };
         img.src = icon.href;
       });
-
     };
     img.src = icon.href;
   }
@@ -239,17 +247,17 @@
   function findAppleId(related) {
     let itunes;
     (related || [])
-        .filter((app) => app['platform'] === 'itunes')
-        .forEach((app) => {
-          if (app['id']) {
-            itunes = app['id'];
-          } else {
-            const match = app['url'].match(/id(\d+)/);
-            if (match) {
-              itunes = match[1];
-            }
+      .filter(app => app['platform'] === 'itunes')
+      .forEach(app => {
+        if (app['id']) {
+          itunes = app['id'];
+        } else {
+          const match = app['url'].match(/id(\d+)/);
+          if (match) {
+            itunes = match[1];
           }
-        });
+        }
+      });
     return itunes;
   }
 
@@ -281,7 +289,7 @@
       // Edge PWA
       const t = getEdgeTitleBar();
       if (t === null) {
-        console.debug('UWP no titleBar')
+        console.debug('UWP no titleBar');
         return;
       }
       t.foregroundColor = colorToWindowsRGBA(themeIsLight ? 'black' : 'white');
@@ -309,10 +317,10 @@
   function colorToWindowsRGBA(color) {
     const data = readColor(color);
     return /** @type {WindowsColor} */ ({
-      'r': data[0],
-      'g': data[1],
-      'b': data[2],
-      'a': data[3],
+      r: data[0],
+      g: data[1],
+      b: data[2],
+      a: data[3]
     });
   }
 
@@ -335,16 +343,16 @@
     const pixelData = readColor(color);
 
     // From https://cs.chromium.org/chromium/src/chrome/android/java/src/org/chromium/chrome/browser/util/ColorUtils.java
-    const data = pixelData.map((v) => {
+    const data = pixelData.map(v => {
       const f = v / 255;
-      return (f < 0.03928) ? f / 12.92 : Math.pow((f + 0.055) / 1.055, 2.4);
+      return f < 0.03928 ? f / 12.92 : Math.pow((f + 0.055) / 1.055, 2.4);
     });
     const lum = 0.2126 * data[0] + 0.7152 * data[1] + 0.0722 * data[2];
-    const contrast = Math.abs((1.05) / (lum + 0.05));
+    const contrast = Math.abs(1.05 / (lum + 0.05));
     return contrast > 3;
   }
 
-  function updateTransparent(image, background, force=false) {
+  function updateTransparent(image, background, force = false) {
     const context = contextForCanvas(image);
     context.drawImage(image, 0, 0);
 
@@ -357,13 +365,13 @@
       }
     }
 
-    context.globalCompositeOperation = 'destination-over';  // only replace transparent areas
+    context.globalCompositeOperation = 'destination-over'; // only replace transparent areas
     context.fillStyle = background;
     context.fillRect(0, 0, image.width, image.height);
     return context.canvas.toDataURL();
   }
 
-  function contextForCanvas({width, height} = {width: 1, height: 1}) {
+  function contextForCanvas({ width, height } = { width: 1, height: 1 }) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -376,4 +384,4 @@
   } else {
     window.addEventListener('load', setup);
   }
-}());
+})();
